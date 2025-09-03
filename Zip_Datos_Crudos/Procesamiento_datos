@@ -1,0 +1,44 @@
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+from scipy.signal import butter, filtfilt
+
+
+file_path = "C:/Users/6003376/Desktop/Marta/tfg/zip-datos-crudos/extrait_wSleepPage01.csv"
+data = pd.read_csv(file_path, delimiter=";", decimal=",") 
+
+data["SS"] = data["SS"].astype(str).str.replace(",", ".")  
+data["Timestamp"] = pd.to_datetime(
+    data["Date"] + " " + data["HH"].astype(str) + ":" + data["MM"].astype(str) + ":" + data["SS"],
+    format="%d/%m/%Y %H:%M:%S.%f",
+    dayfirst=True
+)
+
+eeg_channels = ["EEG C3-A1", "EEG O1-A1", "EEG C4-A1", "EEG O2-A1"]
+eeg_data = data[eeg_channels].values.T
+
+def bandpass_filter(data, lowcut=0.5, highcut=50, fs=200, order=5):
+    nyq = 0.5 * fs 
+    low = lowcut / nyq
+    high = highcut / nyq
+    b, a = butter(order, [low, high], btype='band')
+    return filtfilt(b, a, data)
+
+fs = 200 
+filtered_eeg = np.array([bandpass_filter(ch, lowcut=0.5, highcut=50, fs=fs) for ch in eeg_data])
+
+plt.figure(figsize=(12, 6))
+for i, ch in enumerate(eeg_channels):
+    plt.subplot(len(eeg_channels), 2, 2*i+1)
+    plt.plot(data['Timestamp'], eeg_data[i], label=f"{ch} (Crudo)")
+    plt.legend()
+    plt.subplot(len(eeg_channels), 2, 2*i+2)
+    plt.plot(data['Timestamp'], filtered_eeg[i], label=f"{ch} (Filtrado)", color='r')
+    plt.legend()
+plt.tight_layout()
+plt.show()
+
+ruta_guardar = "C:/Users/6003376/Desktop/datos_filtrados.csv"
+filtered_df = pd.DataFrame(filtered_eeg.T, columns=eeg_channels)
+filtered_df.insert(0, "Timestamp", data["Timestamp"])
+filtered_df.to_csv("ruta_guardar", index=False, sep=";", decimal=",")
